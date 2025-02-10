@@ -3,7 +3,7 @@ let overlap_threshold = 45;
 let broadcasterPlayerId = "";
 let resolvePlayerInfo = require("@akashic-extension/resolve-player-info");
 let tween_animation = require("@akashic-extension/akashic-timeline");
-let userDatas = require("./userData");
+
 let PlayerDatas = [{}];
 let PlayerIds = [];
 
@@ -31,7 +31,7 @@ function main(param) {
   let waittime = 0;
 
   let gametime = 0;
-  let settingObj,settingstrs,sankaObj,startObj,playercntObj
+  let findObjs,sankaObj,startObj,playercntObj
   let backlayer = new g.E({ scene: scene, parent: scene });   //背景
   let buttonlayer = new g.E({ scene: scene, parent: scene });   //ボタン
 
@@ -50,15 +50,119 @@ function main(param) {
     ///////////////////
     //メイン画像
     let backbody = new g.FrameSprite({scene: scene, src: scene.assets["body" + bodyNo],
-        x: g.game.width/2, y: g.game.height/2,anchorX: 0.5, anchorY: 0.5, hidden : true, touchable: false});
+      x: g.game.width/2, y: g.game.height/2,anchorX: 0.5, anchorY: 0.5, hidden : true, touchable: false});
     scene.append(backbody);
 
     //当たり判定(普段は見えない)
     //ターゲットラベル
-    let find = new g.FilledRect({scene: scene,x:t_list[t_int][0], y:t_list[t_int][1], width: t_list[t_int][2], height:t_list[t_int][3], 
-        angle:t_list[t_int][4], cssColor: "black", hidden : true ,opacity:0});
-    scene.append(find);
+    let t_list = createTargetList(bodyNo);
+    let find1 = new g.FilledRect({scene: scene,x:t_list[1][0], y:t_list[1][1], width: t_list[1][2], height:t_list[1][3], angle:t_list[1][4], cssColor: "black", hidden : true ,opacity:0.2});
+    let find2 = new g.FilledRect({scene: scene,x:t_list[2][0], y:t_list[2][1], width: t_list[2][2], height:t_list[2][3], angle:t_list[2][4], cssColor: "blue", hidden : true ,opacity:0.2});
+    let find3 = new g.FilledRect({scene: scene,x:t_list[3][0], y:t_list[3][1], width: t_list[3][2], height:t_list[3][3], angle:t_list[3][4], cssColor: "green", hidden : true ,opacity:0.2});
+    let find4 = new g.FilledRect({scene: scene,x:t_list[4][0], y:t_list[4][1], width: t_list[4][2], height:t_list[4][3], angle:t_list[4][4], cssColor: "yellow", hidden : true ,opacity:0.2});
+    let find5 = new g.FilledRect({scene: scene,x:t_list[5][0], y:t_list[5][1], width: t_list[5][2], height:t_list[5][3], angle:t_list[5][4], cssColor: "red", hidden : true ,opacity:0.2});
+    let find6 = new g.FilledRect({scene: scene,x:t_list[6][0], y:t_list[6][1], width: t_list[6][2], height:t_list[6][3], angle:t_list[6][4], cssColor: "purple", hidden : true ,opacity:0.2});
+    scene.append(find1);
+    scene.append(find2);
+    scene.append(find3);
+    scene.append(find4);
+    scene.append(find5);
+    scene.append(find6);
+    findObjs = [find1,find2,find3,find4,find5,find6];
 
+
+    /////////////////
+    ////放送主判定////
+    /////////////////
+    g.game.onJoin.add(ev => {
+      broadcasterPlayerId = ev.player.id; // 放送者のプレイヤーID
+      // 自分が放送者なら、「締め切る」ボタンを表示。
+      if (g.game.selfId === broadcasterPlayerId) {
+        //参加処理
+        resolvePlayerInfo.resolvePlayerInfo({ raises: true });
+        sankaObj.forEach(Obj => {Obj.touchable = false; Obj.hide();});
+        sankaObj.forEach(Obj => {Obj.modified();});
+      }
+      else{
+        startObj.forEach(Obj => {Obj.hide(); Obj.touchable = false;});
+      }
+      startObj.forEach(Obj => {Obj.modified();});
+    });
+
+    ///////////////////////////////////////////
+    ////操作キャラ表示優先度制御用オブジェクト////
+    ///////////////////////////////////////////
+    const players_back = new g.E({scene: scene, x: 0, y: 0, width: g.game.width, height: g.game.height, touchable: false, local: true});
+    scene.append(players_back);
+
+    const players_front = new g.E({scene: scene, x: 0, y: 0, width: g.game.width, height: g.game.height, touchable: false, local: true});
+    scene.append(players_front);
+
+    ///////////////////////////////////////
+    ////操作キャラ生成・プレイヤー情報記録////
+    ///////////////////////////////////////
+    g.game.onPlayerInfo.add((ev) => {
+    // リログ時にプレイヤーが多重生成されるので対応
+    // PlayerIds内に入力されたプレイヤーIDが無い時のみ処理
+    if (PlayerIds.indexOf(ev.player.id) == -1){
+        // 各プレイヤーが名前利用許諾のダイアログに応答した時、通知されます。
+        // ev.player.name にそのプレイヤーの名前が含まれます。
+        // (ev.player.id には (最初から) プレイヤーIDが含まれています)
+
+        const isLocalPlayer = ev.player.id === g.game.selfId;
+        const Nushi_Then = ev.player.id === broadcasterPlayerId;
+        const isHighPriority = isLocalPlayer || Nushi_Then;
+
+        // プレイヤー画像
+        const imageObj = scene.assets[isLocalPlayer ? "main_player" : Nushi_Then ? "host_player" : "npc_player"];
+
+        PlayerIds.push(ev.player.id);
+        let playerImage = new g.FrameSprite({scene: scene, src: imageObj,
+          x: getrandom(22.5,1240,-1), y: 700, opacity: 1, local: true, hidden:true});
+          (isHighPriority ? players_front : players_back).append(playerImage);
+        playerImage.invalidate();
+
+        let name = ev.player.name;
+        // 名前はnullになることがあるので、その対策としてデフォルト値を設定
+        if (name == null) {
+        name = "██████████";
+        }
+
+        PlayerDatas[ev.player.id] = {
+        Name:name,
+        Main_Player:playerImage,
+        moveX:0,
+        moveY:0,
+        imageD:0,
+        sotuThen:false,
+        destoroyed:false,
+        images:imageObj
+        };
+        playercntLabel.text = String(PlayerIds.length) + "人",
+        playercntLabel.invalidate();
+      }
+      });
+
+      ////////////////////////////
+      ////プレイヤー人数カウント////
+      ////////////////////////////
+      let playercntBack = new g.FilledRect({scene: scene,x: g.game.width*0.73, y: g.game.height/5,
+      width: 300, height: 300, cssColor: "gray", opacity: 0.5, parent:backlayer,touchable:false});
+      scene.append(playercntBack);
+
+      let playercntLabel = new g.Label({
+      scene: scene, x: g.game.width*0.8, y: g.game.height/2.65, font: font, text: 1 + "人",
+      fontSize: 75, textColor: "black", touchable: false,opacity: 1,local: false
+      });
+      scene.append(playercntLabel);
+
+      let playercntHedder = new g.Label({
+      scene: scene, x: g.game.width*0.77, y: g.game.height/4, font: font, text: "参加人数",
+      fontSize: 50, textColor: "black", touchable: false,opacity: 1
+      });
+      scene.append(playercntHedder);
+
+      playercntObj = [playercntBack,playercntHedder,playercntLabel]
 
     /////////////////
     ////参加ボタン////
@@ -81,7 +185,7 @@ function main(param) {
     ////開始ボタン////
     /////////////////
     let startBack = new g.FilledRect({scene: scene,x: g.game.width*0.1 -10, y: g.game.height * 0.9,
-      width: 215, height: 60, cssColor: "gray", opacity: 0.3, touchable: false, local: true});
+      width: 215, height: 60, cssColor: "gray", opacity: 0.3, touchable: true, local: true});
     scene.append(startBack);
     let startButton = new g.Label({
       scene: scene, x: g.game.width*0.1, y: g.game.height * 0.9, font: font, text: "締め切る",
@@ -93,91 +197,12 @@ function main(param) {
     });
     startObj = [startBack,startButton];
 
-
-    ///////////////////
-    ////制限時間設定////
-    ///////////////////
-    //制限時間設定用背景
-    let gamesecondBack = new g.FilledRect({scene: scene,x: g.game.width*0.05, y: g.game.height/5,
-      width: 760, height: 300, cssColor: "gray", opacity: 0.5, parent:backlayer,touchable:false, local:false});
-    scene.append(gamesecondBack);
-
     // 残り時間表示用ラベル
     let timeLabel = new g.Label({
-      scene: scene, x: g.game.width * 0.05, font: font, text: "60", hidden:true,
+      scene: scene, x: g.game.width * 0.05, font: font, text: gamesecond, hidden:true,
       fontSize: 50, textColor: "black", touchable: false,opacity: 1, parent:buttonlayer,local: false
     });
     scene.append(timeLabel);
-
-    //秒ボタン
-    //+1
-    let oneplusBack = new g.FilledRect({scene: scene,x: g.game.width * 0.55, y: g.game.height / 2.5,
-      width: 100, height: 60, cssColor: "black", opacity: 0.3, parent:buttonlayer,local: false});
-    scene.append(oneplusBack);
-    oneplusBack.onPointDown.add(() => {
-      g.game.raiseEvent(new g.MessageEvent({ message: "secondUpdate", PulsSecond: 1}));
-    });
-    let oneplusButton = new g.Label({
-      scene: scene, x: g.game.width * 0.56, y: g.game.height / 2.5, font: font, text: "+１",
-      fontSize: 50, textColor: "black", touchable: false,opacity: 1, parent:buttonlayer,local: false
-    });
-    scene.append(oneplusButton);
-
-    //+10
-    let tenplusBack = new g.FilledRect({scene: scene,x: g.game.width * 0.44, y: g.game.height/2.5,
-      width: 120, height: 60, cssColor: "black", opacity: 0.3, parent:buttonlayer,local: false});
-    scene.append(tenplusBack);
-    tenplusBack.onPointDown.add(() => {
-      g.game.raiseEvent(new g.MessageEvent({ message: "secondUpdate", PulsSecond: 10}));
-    });  
-    let tenplusButton = new g.Label({
-      scene: scene, x: g.game.width * 0.445, y: g.game.height / 2.5, font: font, text: "+10",
-      fontSize: 50, textColor: "black", touchable: false,opacity: 1, parent:buttonlayer,local: false
-    });
-    scene.append(tenplusButton);
-
-    //-1
-    let onepullBack = new g.FilledRect({scene: scene,x: g.game.width * 0.07, y: g.game.height / 2.5,
-      width: 95, height: 60, cssColor: "black", opacity: 0.3, parent:buttonlayer,local: false});
-    scene.append(onepullBack);
-    onepullBack.onPointDown.add(() => {
-      g.game.raiseEvent(new g.MessageEvent({ message: "secondUpdate", PulsSecond: -1}));
-    });
-    let onepullButton = new g.Label({
-      scene: scene, x: g.game.width * 0.085, y: g.game.height / 2.5, font: font, text: "-１",
-      fontSize: 50, textColor: "black", touchable: false,opacity: 1, parent:buttonlayer,local: false
-    });
-    scene.append(onepullButton);
-
-    //-10
-    let tenpullBack = new g.FilledRect({scene: scene,x: g.game.width * 0.16, y: g.game.height / 2.5,
-      width: 110, height: 60, cssColor: "black", opacity: 0.3, parent:buttonlayer,touchable:true,local: false});
-    scene.append(tenpullBack);
-    tenpullBack.onPointDown.add(() => {
-      g.game.raiseEvent(new g.MessageEvent({ message: "secondUpdate", PulsSecond: -10}));
-    });
-    let tenpullButton = new g.Label({
-      scene: scene, x: g.game.width * 0.17, y: g.game.height / 2.5, font: font, text: "-10",
-      fontSize: 50, textColor: "black", touchable: false,opacity: 1, parent:buttonlayer,local: false
-    });
-    scene.append(tenpullButton);
-
-    //秒ラベル
-    let gamesecondLabel = new g.Label({
-      scene: scene, x: g.game.width * 0.28, y: g.game.height/2.65, font: font, text: gamesecond + "秒",
-      fontSize: 75, textColor: "black", touchable: false,opacity: 1,local: false
-    });
-    scene.append(gamesecondLabel);
-    let gamesecondHedder = new g.Label({
-      scene: scene, x: g.game.width * 0.26, y: g.game.height/4, font: font, text: "制限時間",
-      fontSize: 50, textColor: "black", touchable: false,opacity: 1,local: false
-    });
-    scene.append(gamesecondHedder);
-
-    //一括処理したいので配列に放り込む
-    settingObj = [startBack,oneplusBack,onepullBack,tenplusBack,tenpullBack,gamesecondBack,gamesecondHedder];
-    settingstrs = [startButton,oneplusButton,onepullButton,tenplusButton,tenpullButton,gamesecondLabel]
-
 
     ///////////////////
     ////クリック処理////
@@ -231,8 +256,7 @@ function main(param) {
     ////////////////////////////
     ////オブジェクト初期化処理////
     ////////////////////////////
-    settingObj.forEach(Obj => {Obj.modified();});
-    settingstrs.forEach(Obj => {Obj.modified();});
+    findObjs.forEach(Obj => {Obj.modified();});
     startObj.forEach(Obj => {Obj.modified();});
     sankaObj.forEach(Obj => {Obj.modified();});
     playercntObj.forEach(Obj => {Obj.modified();});
@@ -251,6 +275,7 @@ function main(param) {
           timeLabel.invalidate();
           startThen = true;
           backbody.show();
+          findObjs.forEach(Obj => {Obj.show();});
           break;
 
         case "secondUpdate":
@@ -279,8 +304,6 @@ function main(param) {
       if (startThen == true){
         //開始処理
         //タイトル・設定項目削除
-        settingObj.forEach(Obj => {Obj.touchable = false; Obj.hide();});
-        settingstrs.forEach(Obj => {Obj.touchable = false; Obj.hide();});
         startObj.forEach(Obj => {Obj.touchable = false; Obj.hide();});
         sankaObj.forEach(Obj => {Obj.touchable = false; Obj.hide();});
         playercntObj.forEach(Obj => {Obj.touchable = false; Obj.hide();});
@@ -342,9 +365,6 @@ function main(param) {
         waittime += 1 / g.game.fps;
         if (waittime > 5){
           waitthen = false;
-
-          //bgm停止
-          bgm1.stop();
 
           PlayerIds.forEach(Id => {
             //プレイヤーオブジェクト削除

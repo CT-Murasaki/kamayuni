@@ -14,11 +14,6 @@
 			"path": "script/_bootstrap.js",
 			"global": true
 		},
-		"userData": {
-			"type": "script",
-			"path": "script/userData.js",
-			"global": true
-		},
 		"haikei": {
 			"type": "image",
 			"width": 1280,
